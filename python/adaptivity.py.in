@@ -1051,7 +1051,7 @@ def analytic_eig(H, tol=1e-12):
                         v3[0,:],v3[1,:],v3[2,:]])
           bad = (numpy.abs(analyt_rot(fulleig(eigL),eigR)-H).sum(0) > tol) | isnan(eigR).any(0) | isnan(eigL).any(0)
           if any(bad):
-           log(INFO,'%0.0f problems in eigendecomposition' % bad.sum())
+           info(INFO,'%0.0f problems in eigendecomposition' % bad.sum())
            for i in numpy.where(bad)[0]:
                [eigL_,eigR_] = pyeig(array([[H[0,i],H[1,i],H[3,i]],\
                                             [H[1,i],H[2,i],H[4,i]],\
