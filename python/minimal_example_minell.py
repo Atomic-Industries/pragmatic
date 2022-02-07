@@ -8,16 +8,13 @@
 ### the width of the step, the number of solition<->adaptation iterations as well as the
 ### error level (eta) are optional input parameters
 
-from dolfin import *
+from fenics import *
 from adaptivity import metric_pnorm, metric_ellipse, adapt
-from pylab import hold, show, figure, triplot, rand, tricontourf, axis, box
-from pylab import plot as pyplot
+import matplotlib.pyplot as plt
 from numpy import array, ones
+from time import time
 
 def check_metric_ellipse(width=2e-2, eta = 0.02, Nadapt=6):
-    set_log_level(WARNING)
-    parameters["allow_extrapolation"] = True
-    
     ### CONSTANTS
     meshsz = 40
     hd = Constant(width)
@@ -32,42 +29,57 @@ def check_metric_ellipse(width=2e-2, eta = 0.02, Nadapt=6):
     testsol2 = 'tanh((' + str(cos(angle)) + '*x[1]-'+ str(sin(angle)) + '*x[0])/' + str(float(hd)) + ')' #tanh(x[0]/hd)
     ddtestsol2 = str(cos(angle)-sin(angle))+'*2*'+testsol2+'*(1-pow('+testsol2+',2))/'+str(float(hd)**2)
     def boundary(x):
-          return x[0]-mesh.coordinates()[:,0].min() < DOLFIN_EPS or mesh.coordinates()[:,0].max()-x[0] < DOLFIN_EPS \
-          or mesh.coordinates()[:,1].min()+0.5 < DOLFIN_EPS or mesh.coordinates()[:,1].max()-x[1] < DOLFIN_EPS  
-    # PERFORM ONE ADAPTATION ITERATION
+        return x[0]-mesh.coordinates()[:,0].min() < DOLFIN_EPS or mesh.coordinates()[:,0].max()-x[0] < DOLFIN_EPS \
+        or mesh.coordinates()[:,1].min()+0.5 < DOLFIN_EPS or mesh.coordinates()[:,1].max()-x[1] < DOLFIN_EPS  
+
     for iii in range(Nadapt):
-     V = FunctionSpace(mesh, "CG" ,2); dis = TrialFunction(V); dus = TestFunction(V); u = Function(V); u2 = Function(V)
-     bc = DirichletBC(V, Expression(testsol), boundary)
-     bc2 = DirichletBC(V, Expression(testsol2), boundary)
-     R = interpolate(Expression(ddtestsol),V)
-     R2 = interpolate(Expression(ddtestsol2),V)
-     a = inner(grad(dis), grad(dus))*dx
-     L = R*dus*dx
-     L2 = R2*dus*dx
-     solve(a == L, u, bc)
-     solve(a == L2, u2, bc2)
-     
-     H  = metric_pnorm(u , eta, max_edge_length=1., max_edge_ratio=50); #Mp =  project(H,  TensorFunctionSpace(mesh, "CG", 1))
-     H2 = metric_pnorm(u2, eta, max_edge_length=1., max_edge_ratio=50); #Mp2 = project(H2, TensorFunctionSpace(mesh, "CG", 1))
-     H3 = metric_ellipse(H,H2); Mp3 = project(H3, TensorFunctionSpace(mesh, "CG", 1))
-     print("H11: %0.0f, H22: %0.0f, V: %0.0f,E: %0.0f" % (assemble(abs(H3[0,0])*dx),assemble(abs(H3[1,1])*dx),mesh.num_vertices(),mesh.num_cells()))
-     startTime = time()
-     if iii != 6:
-     # mesh2 = Mesh(adapt(Mp2))
-       mesh = Mesh(adapt(Mp3))
-     # mesh3 = adapt(Mp)
-      
-     print("total time was %0.1fs" % (time()-startTime))
-    
+        V = FunctionSpace(mesh, "CG" ,2)
+        dis = TrialFunction(V)
+        dus = TestFunction(V)
+        u = Function(V)
+        u2 = Function(V)
+        bc = DirichletBC(V, Expression(testsol, degree=2), boundary)
+        bc2 = DirichletBC(V, Expression(testsol2, degree=2), boundary)
+        R = interpolate(Expression(ddtestsol, degree=2),V)
+        R2 = interpolate(Expression(ddtestsol2, degree=2),V)
+        a = inner(grad(dis), grad(dus))*dx
+        L = R*dus*dx
+        L2 = R2*dus*dx
+        solve(a == L, u, bc)
+        solve(a == L2, u2, bc2)
+
+        H  = metric_pnorm(u , eta, max_edge_length=1., max_edge_ratio=50);
+        Mp =  project(H,  TensorFunctionSpace(mesh, "CG", 1))
+        H2 = metric_pnorm(u2, eta, max_edge_length=1., max_edge_ratio=50);
+        Mp2 = project(H2, TensorFunctionSpace(mesh, "CG", 1))
+        H3 = metric_ellipse(H,H2)
+        Mp3 = project(H3, TensorFunctionSpace(mesh, "CG", 1))
+        print("H11: %0.0f, H22: %0.0f, V: %0.0f,E: %0.0f" % (assemble(abs(H3[0,0])*dx),assemble(abs(H3[1,1])*dx),mesh.num_vertices(),mesh.num_cells()))
+        startTime = time()
+        if iii != Nadapt-1:
+            mesh, mf = adapt(Mp)
+            mesh2, mf = adapt(Mp2)
+            mesh3, mf = adapt(Mp3)
+            
+        print("total time was %0.1fs" % (time()-startTime))
+
+
+    import os
+    save_dir = 'output'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
     # PLOT MESH
-    figure(1); triplot(mesh.coordinates()[:,0],mesh.coordinates()[:,1],mesh.cells()); axis('equal'); axis('off'); box('off')
-    #figure(2); triplot(mesh2.coordinates()[:,0],mesh2.coordinates()[:,1],mesh2.cells()) #mesh = mesh2
-    #figure(3); triplot(mesh3.coordinates()[:,0],mesh3.coordinates()[:,1],mesh3.cells()) #mesh = mesh3
-    figure(4); testf = interpolate(u2,FunctionSpace(mesh,'CG',1))
+    plt.figure()
+    plt.triplot(mesh.coordinates()[:,0],mesh.coordinates()[:,1],mesh.cells())
+    plt.savefig(f'{save_dir}/minell_mesh.png')
+
+    plt.figure()
+    testf = interpolate(u2,FunctionSpace(mesh,'CG',1))
     vtx2dof = vertex_to_dof_map(FunctionSpace(mesh, "CG" ,1))
-    zz = testf.vector().array()[vtx2dof]; zz[zz==1] -= 1e-16
-    tricontourf(mesh.coordinates()[:,0],mesh.coordinates()[:,1],mesh.cells(),zz,100)
-    show()
+    zz = testf.vector()[vtx2dof]; zz[zz==1] -= 1e-16
+    plt.tricontourf(mesh.coordinates()[:,0],mesh.coordinates()[:,1],mesh.cells(),zz,100)
+    plt.savefig(f'{save_dir}/minell_sol.png')
 
 if __name__=="__main__":
- check_metric_ellipse() 
+    check_metric_ellipse() 
