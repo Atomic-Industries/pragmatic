@@ -54,11 +54,10 @@ def minimal_example3D(width=2e-2, Nadapt=10, eta = 0.04):
         if iii != Nadapt-1:
             mesh = adapt(H) 
             L2error = errornorm(Expression(testsol, degree=2), u, degree_rise=4, norm_type='L2')
-            info("total (adapt+metric) time was %0.1fs, L2error=%0.0e, nodes: %0.0f" % (time()-startTime,L2error,mesh.num_vertices()))
+            info("total (adapt+metric) time was %0.1fs, L2error=%0.0e, nodes: %0.0f" % (time()-startTime,L2error,mesh.num_cells()))
         
-
-    plot(u,interactive=True)
-    plot(mesh,interactive=True)
+    # plot(u,interactive=True)
+    # plot(mesh,interactive=True)
 
 
 if __name__=="__main__":
