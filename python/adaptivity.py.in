@@ -1281,45 +1281,10 @@ def c_cell_dofs(mesh,V):
   # INPUT : DOLFIN TENSOR VARIABLE (CG1 or DG0)
   # OUTPUT: outarg.shape = (4*N,) or outarg.shape = (9*N,)
   # The DOLFIN storage CONVENTION was greatly simplified at 1.3.0 :
-  if dolfin.__version__ >= '1.3.0':
-   if V.ufl_element().is_cellwise_constant():
-    return arange(mesh.num_cells()*mesh.geometry().dim()**2)
-   else:
-    return arange(mesh.num_vertices()*mesh.geometry().dim()**2)
+  if V.ufl_element().is_cellwise_constant():
+   return arange(mesh.num_cells()*mesh.geometry().dim()**2)
   else:
-      #returns the degrees of freedom numbers in a cell
-      code = """
-
-	    #include <dolfin/fem/DofMap.h>
-	    #include <pybind11/pybind11.h>
-	    #include <pybind11/numpy.h>
-	    #include <pybind11/pytypes.h>
-	    #include <pybind11/stl.h>
-	    #include <pybind11/cast.h>
-
-	    namespace py = pybind11;
-
-	    namespace dolfin {
-	    void cell_dofs(std::shared_ptr<GenericDofMap> dofmap, const std::vector<std::size_t>& cell_indices, std::vector<std::size_t>& dofs);
-
-	    void cell_dofs(std::shared_ptr<GenericDofMap> dofmap, const std::vector<std::size_t>& cell_indices, std::vector<std::size_t>& dofs)
-	    {
-	    assert(dofmap);
-	    std::size_t local_dof_size = dofmap->cell_dofs(0).size();
-	    const std::size_t size = cell_indices.size()*local_dof_size;
-	    dofs.resize(size);
-	    for (std::size_t i=0; i<cell_indices.size(); i++)
-	       for (std::size_t j=0; j<local_dof_size;j++)
-		   dofs[i*local_dof_size+j] = dofmap->cell_dofs(cell_indices[i])[j];
-	    }
-	    PYBIND11_MODULE(SIGNATURE, m){
-	      m.def("cell_dofs", &cell_dofs);
-	    }
-	    }
-
-	    """
-      module = compile_cpp_code(cpp_code=code)
-      return module.cell_dofs(V.dofmap(), arange(mesh.num_cells(), dtype=numpy.uintp))
+   return arange(mesh.num_vertices()*mesh.geometry().dim()**2)
 
 
 if __name__=="__main__":
